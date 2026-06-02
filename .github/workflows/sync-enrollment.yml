@@ -1,0 +1,43 @@
+name: Daily PESRP Enrollment Update
+
+on:
+  schedule:
+    - cron: '0 20 * * *' # Runs automatically every night at 8:00 PM UTC (1:00 AM PKT)
+  workflow_dispatch: # Allows you to trigger it manually via the Actions tab anytime
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Allows GitHub Action runner to commit changes back to your repo
+
+    steps:
+      - name: Checkout Repository Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Processing Libraries
+        run: pip install pandas requests
+
+      - name: Generate Minified Enrollment JSON
+        run: python generate_enrollment.py
+
+      - name: Check and Commit Data Changes
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # Stage the generated file
+          git add data/live_enrollment.json
+          
+          # Commit and push only if changes exist to prevent empty logs
+          if git diff --staged --quiet; then
+            echo "No data changes found today. Skipping commit."
+          else
+            git commit -m "Automated Sync: Updated daily school enrollment stats"
+            git push
+          fi

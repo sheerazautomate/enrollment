@@ -259,55 +259,12 @@
     <div id="chartParent"><canvas id="chart"></canvas></div>
   </div>
 </div>
-
+<script src="fetch-data.js"></script>
 <script>
 let MASTER_DATA = [], hierarchy = {}, chart, fullTableData = [], currentPage = 1, currentFilterType = "all", insightDonutChart = null;
 
 function showLoader(txt) { if(txt) document.getElementById("loaderText").innerText = txt; document.getElementById("loader").style.display = "flex"; }
 function hideLoader() { document.getElementById("loader").style.display = "none"; }
-
-// Convert Google Sheets CSV to JSON format for dashboard
-async function convertGoogleSheetData() {
-  const csvUrl = "https://docs.google.com/spreadsheets/d/1AxmpCZhsQ-rFAJkgYrTbPby6FEG8HHkbL60IStUl-ak/export?format=csv";
-  
-  try {
-    const response = await fetch(csvUrl);
-    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-    
-    const csv = await response.text();
-    const lines = csv.split('\n').slice(1); // Skip header
-    
-    const data = lines.map(line => {
-      const cols = line.split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(c => {
-        let val = c.trim();
-        if (val.startsWith('"') && val.endsWith('"')) {
-          val = val.substring(1, val.length - 1).trim();
-        }
-        return val;
-      });
-
-      return [
-        cols[0],  // 0: District
-        cols[1],  // 1: Tehsil
-        cols[2],  // 2: Markaz
-        cols[3],  // 3: Wing
-        cols[5],  // 4: EMIS
-        cols[6],  // 5: School
-        parseInt(cols[12]) || 0,  // 6: Baseline
-        parseInt(cols[16]) || 0,  // 7: Current
-        parseInt(cols[17]) || 0,  // 8: Target
-        parseInt(cols[21]) || 0,  // 9: Previous
-        parseInt(cols[13]) || 0   // 10: New Target (NT) - Added
-      ];
-    }).filter(r => r[0] && r[0].trim() !== ""); 
-    
-    return data;
-  } catch (error) {
-    console.error('Error fetching CSV:', error);
-    throw error;
-  }
-}
-
 function buildHierarchy(data) {
   let h = {};
   data.forEach(r => {

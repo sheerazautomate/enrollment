@@ -2,7 +2,7 @@ name: Daily PESRP Enrollment Update
 
 on:
   schedule:
-    - cron: '0 20 * * *' # Runs automatically every night at 8:00 PM UTC (1:00 AM PKT)
+    - cron: '0 02 * * *' # Runs automatically every night at 2:00 AM UTC (7:00 AM PKT)
   workflow_dispatch: # Allows you to trigger it manually via the Actions tab anytime
 
 jobs:

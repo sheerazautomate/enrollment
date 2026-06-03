@@ -1,76 +1,67 @@
 // High-Performance Data Compiler (Flexible Live Sync)
 async function convertGoogleSheetData() {
-  const baseSchoolsUrl = "data/base_schools.json";
-  const liveEnrollmentUrl = "data/live_enrollment.json";
+  const baseSchoolsUrl      = "data/base_schools.json";
+  const liveEnrollmentUrl   = "data/live_enrollment.json";
+  const yesterdayEnrollmentUrl = "data/yesterday_enrollment.json";
   
   try {
     console.log("🚀 Loading fast cache data layers...");
     
-    // Fetch both assets at the same time
-    const [baseResponse, liveResponse] = await Promise.all([
+    // Fetch all three assets in parallel
+    const [baseResponse, liveResponse, yesterdayResponse] = await Promise.all([
       fetch(baseSchoolsUrl),
-      fetch(liveEnrollmentUrl).catch(() => null)
+      fetch(liveEnrollmentUrl).catch(() => null),
+      fetch(yesterdayEnrollmentUrl).catch(() => null)
     ]);
     
     if (!baseResponse.ok) throw new Error("Failed to load base_schools.json profile configuration.");
     const baseSchools = await baseResponse.json();
     
-    let liveRawData = [];
+    // Parse live enrollment — flat { "EMIS": count }
+    let liveRawData = {};
     if (liveResponse && liveResponse.ok) {
       liveRawData = await liveResponse.json();
     }
-    
-    // Create a flexible lookup map to normalize your existing live file data
-    const liveMap = {};
-    
-    // Helper function to remove spaces, underscores, and casing for bulletproof matching
-    const cleanKey = (str) => String(str).toLowerCase().replace(/[^a-z0-9]/g, '');
-    
-    const findValue = (obj, possibleNames) => {
-      for (let key in obj) {
-        if (possibleNames.includes(cleanKey(key))) return obj[key];
-      }
-      return null;
-    };
 
-    // Parse your live data file dynamically whether it's an Array or an Object map
-    if (Array.isArray(liveRawData)) {
-      liveRawData.forEach(row => {
-        const emis = findValue(row, ['emiscode', 'emis', 'semiscode', 'emis_code']);
-        if (emis) {
-          const current = findValue(row, ['currentenrolment', 'current', 'livecurrent', 'currentenrollment']);
-          const yesterday = findValue(row, ['yesterdaysenrolment', 'yesterday', 'yesterdayenrollment', 'yesterdaysenrollment']);
-          liveMap[String(emis).trim()] = { current, yesterday };
-        }
-      });
-    } else if (typeof liveRawData === 'object' && liveRawData !== null) {
-      for (let emis in liveRawData) {
-        const row = liveRawData[emis];
-        if (typeof row === 'object' && row !== null) {
-          const current = findValue(row, ['currentenrolment', 'current', 'livecurrent', 'currentenrollment']);
-          const yesterday = findValue(row, ['yesterdaysenrolment', 'yesterday', 'yesterdayenrollment', 'yesterdaysenrollment']);
-          liveMap[String(emis).trim()] = { current, yesterday };
-        } else {
-          // Fallback if it's a direct key-value map { "EMIS": CurrentCount }
-          liveMap[String(emis).trim()] = { current: row, yesterday: row };
-        }
-      }
+    // Parse yesterday enrollment — same flat { "EMIS": count } format
+    let yesterdayRawData = {};
+    if (yesterdayResponse && yesterdayResponse.ok) {
+      yesterdayRawData = await yesterdayResponse.json();
     }
-    
+
+    // Build lookup maps: { "EMIS": count }
+    // Both files are flat dicts so no parsing acrobatics needed
+    const liveMap      = {};
+    const yesterdayMap = {};
+
+    for (const emis in liveRawData) {
+      liveMap[String(emis).trim()] = parseInt(liveRawData[emis]) || 0;
+    }
+
+    for (const emis in yesterdayRawData) {
+      yesterdayMap[String(emis).trim()] = parseInt(yesterdayRawData[emis]) || 0;
+    }
+
     console.log(`✅ Successfully mapped structural profiles with live CSV-JSON assets.`);
     
-    // Assemble the complete 11-index tracking array for your interface
+    // Assemble the complete 11-index tracking array for the interface
     return baseSchools.map(row => {
       const emisStr = String(row[4]).trim();
-      const live = liveMap[emisStr] || {};
-      
+
       const baseline  = parseInt(row[6]) || 0;
       const target    = parseInt(row[7]) || 0;
       const newTarget = parseInt(row[8]) || 0;
-      
-      // Pull directly from your live JSON data properties, fallback safely if not found
-      const current   = (live.current !== null && live.current !== undefined) ? parseInt(live.current) : baseline;
-      const yesterday = (live.yesterday !== null && live.yesterday !== undefined) ? parseInt(live.yesterday) : current;
+
+      // Current enrollment from live file, fallback to baseline if school not found
+      const current = (liveMap[emisStr] !== undefined)
+        ? liveMap[emisStr]
+        : baseline;
+
+      // Yesterday enrollment from yesterday file.
+      // Falls back to current so delta shows 0 rather than a misleading number.
+      const yesterday = (yesterdayMap[emisStr] !== undefined)
+        ? yesterdayMap[emisStr]
+        : current;
       
       return [
         String(row[0]).toUpperCase().trim(), // Index 0: District

@@ -31,8 +31,8 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # Stage the generated file
-          git add data/live_enrollment.json
+          # Stage both data files — live (today) and yesterday snapshot
+          git add data/live_enrollment.json data/yesterday_enrollment.json
           
           # Commit and push only if changes exist to prevent empty logs
           if git diff --staged --quiet; then
